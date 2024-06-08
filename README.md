@@ -26,7 +26,7 @@ For bug reports about _this_ fork of NQC, please [file a GitHub Issue](https://g
 WebAssembly Support
 ===================
 
-A new NQC platform target implemented by GitHub user [maehw](https://github.com/maehw) is WebAssembly.
+A new NQC platform target implemented by GitHub user [maehw](https://github.com/maehw) is WebAssembly, which is part of a [broader vision](https://www.eurobricks.com/forum/index.php?/forums/topic/197807-webpbrickcom-programming-the-1st-generation-lego-mindstorms-ris-yellow-rcx-brick-from-the-webbrowser/).
 The initial [WebNQC](https://github.com/maehw/WebNQC) implementation only targets WebAssembly (dropping support for Linux, Windows, and MacOS),
 but it might be possible to circle back and add WebAssembly as an additional platform target.
 
