@@ -72,7 +72,7 @@ FILE *gErrorStream = stderr;
 #define kMaxPrintedErrors   10
 
 
-
+#ifndef __wasm__
 class AutoLink : public RCX_Link
 {
 public:
@@ -91,7 +91,7 @@ private:
     const char* fSerialPort;
     bool fOpen;
 };
-
+#endif
 
 
 class MyCompiler : public Compiler, public ErrorHandler
@@ -124,10 +124,14 @@ private:
 #define kUsageError (kRCX_LastError - 1)
 #define kQuietError (kRCX_LastError - 2)
 
-// codes for the actions
+// codes for the actions (not all are supported by WebAssembly)
 enum {
     kFirstActionCode = 256,
-    kDatalogCode = kFirstActionCode,
+    kHelpCode = kFirstActionCode,
+    kApiCode,
+    kCompileStdinCode,
+#ifndef __wasm__
+    kDatalogCode,
     kDatalogFullCode,
     kClearMemoryCode,
     kFirmwareCode,
@@ -144,16 +148,34 @@ enum {
     kRawCode,
     kRaw1Code,
     kRemoteCode,
-    kApiCode,
-    kHelpCode,
-    kCompileStdinCode
+#endif
 };
 
-/// These must be in the same order as the codes for the long options
+// Names for the action codes
+// NOTE: These must be in the same order as the codes for the long options!
 static const char *sActionNames[] = {
-    "datalog", "datalog_full", "clear", "firmware", "firmfast",
-    "getversion", "batterylevel", "near", "far", "watch", "sleep",
-    "run", "pgm", "msg", "raw", "raw1", "remote", "api", "help", ""
+    "help",
+    "api",
+    "",
+#ifndef __wasm__
+    "datalog",
+    "datalog_full",
+    "clear",
+    "firmware",
+    "firmfast",
+    "getversion",
+    "batterylevel",
+    "near",
+    "far",
+    "watch",
+    "sleep",
+    "run",
+    "pgm",
+    "msg",
+    "raw",
+    "raw1",
+    "remote",
+#endif
 };
 
 /// These MUST be in the same order as the RCX_TargetType values
@@ -192,18 +214,9 @@ static int CheckExtension(const char *s1, const char *ext);
 static RCX_Image *Compile(const char *sourceFile,  int flags);
 static bool GenerateListing(RCX_Image *image, const char *filename,
     bool includeSource, bool generateLASM);
-static RCX_Result Download(RCX_Image *image);
-static RCX_Result UploadDatalog(bool verbose);
-static RCX_Result DownloadFirmware(const char *filename, bool fast);
-static RCX_Result GetVersion();
-static RCX_Result GetBatteryLevel();
-static RCX_Result SetWatch(const char *timeSpec);
 static RCX_Result SetErrorFile(const char *filename);
 static RCX_Result RedirectOutput(const char *filename);
-static RCX_Result SendRawCommand(const char *text, bool retry);
-static RCX_Result ClearMemory();
 static RCX_Result SetTarget(const char *name);
-static RCX_Result SendRemote(const char *event, int repeat);
 #ifdef TEST_LEXER
 static void PrintToken(int t, TokenVal v);
 #endif
@@ -211,7 +224,19 @@ static void PrintApi(bool compatMode);
 static bool SameString(const char *s1, const char *s2);
 static void PrintVersion();
 
+#ifndef __wasm__
+static RCX_Result Download(RCX_Image *image);
+static RCX_Result UploadDatalog(bool verbose);
+static RCX_Result DownloadFirmware(const char *filename, bool fast);
+static RCX_Result GetVersion();
+static RCX_Result GetBatteryLevel();
+static RCX_Result SetWatch(const char *timeSpec);
+static RCX_Result SendRawCommand(const char *text, bool retry);
+static RCX_Result ClearMemory();
+static RCX_Result SendRemote(const char *event, int repeat);
+
 AutoLink gLink;
+#endif
 
 /// Default is an RCX running firmware v.0328 or later.
 RCX_TargetType gTargetType = kRCX_RCX2Target;
@@ -233,7 +258,9 @@ int main(int argc, char **argv)
     result = ProcessCommandLine(argc, argv);
     PrintError(result);
 
+#ifndef __wasm__
     gLink.Close();
+#endif
 
     if (gErrorStream != stderr && gErrorStream != stdout) {
         fclose(gErrorStream);
@@ -298,16 +325,39 @@ RCX_Result ProcessCommandLine(int argc, char ** argv)
             }
 
             switch(code) {
-                // options
-                case '1':
-                    req.fFlags |= Compiler::kCompat_Flag;
+                // help options
+                case kHelpCode:
+                    PrintUsage();
+                    break;
+                case kApiCode:
+                    PrintApi(req.fFlags & Compiler::kCompat_Flag);
+                    break;
+
+                // compilation options
+                case kCompileStdinCode:
+                    result = ProcessFile(nil, req);
+                    fileProcessed = true;
+                    break;
+                case 'T':
+                    if  (*(a+2)=='\0') return kUsageError;
+                    result = SetTarget(a+2);
+                    break;
+                case 'n':
+                    req.fFlags |= Compiler::kNoSysFile_Flag;
                     break;
                 case 'D':
                     if  (*(a+2)=='\0') return kUsageError;
                     DefineMacro(a+2);
                     break;
+                case 'U':
+                    if  (*(a+2)=='\0') return kUsageError;
+                    Compiler::Get()->Undefine(a+2);
+                    break;
                 case 'E':
                     result = SetErrorFile(a+2);
+                    break;
+                case 'R':
+                    result = RedirectOutput(a+2);
                     break;
                 case 'I':
                     if  (*(a+2)=='\0') return kUsageError;
@@ -317,8 +367,8 @@ RCX_Result ProcessCommandLine(int argc, char ** argv)
                     req.fListing = true;
                     req.fListFile = a[2] ? a+2 : 0;
                     break;
-                case 'R':
-                    result = RedirectOutput(a+2);
+                case 'l':
+                    req.fListing = true;
                     break;
                 case 's':
                     req.fSourceListing = true;
@@ -326,17 +376,27 @@ RCX_Result ProcessCommandLine(int argc, char ** argv)
                 case 'c':
                     req.fGenLASM = true;
                     break;
+                case 'v':
+                    gVerbose = true;
+                    break;
+                case 'q':
+                    gQuiet = true;
+                    break;
                 case 'O':
                     if  (*(a+2)=='\0') return kUsageError;
                     req.fOutputFile = a+2;
                     break;
-                case 'S':
-                    if  (*(a+2)=='\0') return kUsageError;
-                    gLink.SetSerialPort(a+2);
+                case '1':
+                    req.fFlags |= Compiler::kCompat_Flag;
                     break;
-                case 'T':
-                    if  (*(a+2)=='\0') return kUsageError;
-                    result = SetTarget(a+2);
+#ifndef __wasm__                    
+                case 'b':
+                    req.fBinary = true;
+                    break;
+
+                // communication options
+                case 'd':
+                    req.fDownload = true;
                     break;
                 case 'x':
                     gLink.SetOmitHeader(true);
@@ -349,38 +409,16 @@ RCX_Result ProcessCommandLine(int argc, char ** argv)
                     if  (*(a+2)=='\0') return kUsageError;
                         gLink.SetDownloadWaitTime(atoi(a+2));
                     break;
-                case 'U':
+                case 'S':
                     if  (*(a+2)=='\0') return kUsageError;
-                    Compiler::Get()->Undefine(a+2);
+                    gLink.SetSerialPort(a+2);
                     break;
-                case 'd':
-                    req.fDownload = true;
-                    break;
-                case 'l':
-                    req.fListing = true;
-                    break;
-                case 'n':
-                    req.fFlags |= Compiler::kNoSysFile_Flag;
-                    break;
-                case 'b':
-                    req.fBinary = true;
-                    break;
-                case 't':
+                case 't':     // This timeout option is not currently listed in the help output
                     if (!args.Remain()) return kUsageError;
                     gTimeout = args.NextInt();
                     break;
-                case 'v':
-                    gVerbose = true;
-                    break;
-                case 'q':
-                    gQuiet = true;
-                    break;
 
                 // actions
-                case kCompileStdinCode:
-                    result = ProcessFile(nil, req);
-                    fileProcessed = true;
-                    break;
                 case kDatalogCode:
                     result = UploadDatalog(false);
                     break;
@@ -446,12 +484,7 @@ RCX_Result ProcessCommandLine(int argc, char ** argv)
                         result = SendRemote(event, repeat);
                     }
                     break;
-                case kApiCode:
-                    PrintApi(req.fFlags & Compiler::kCompat_Flag);
-                    break;
-                case kHelpCode:
-                    PrintUsage();
-                    break;
+#endif
                 default:
                     return kUsageError;
             }
@@ -509,38 +542,6 @@ RCX_Result SetTarget(const char *name)
     }
     return kUsageError;
 }
-
-/**
- * Set the clock/watch on the target
- *
- * @param timeSpec a string to be converted into 24h hh:mm time, or "now" for current
- *  local time
- * @return the RCX_Result from running kRCX_SetWatchOp
- */
-RCX_Result SetWatch(const char *timeSpec)
-{
-    int hour;
-    int minute;
-    RCX_Cmd cmd;
-
-    if (strcmp(timeSpec, "now")==0) {
-        time_t t;
-        struct tm *tmp;
-
-        time(&t);
-        tmp = localtime(&t);
-        hour = tmp->tm_hour;
-        minute = tmp->tm_min;
-    }
-    else {
-        int t = atoi(timeSpec);
-        hour = t / 100;
-        minute = t % 100;
-    }
-
-    return gLink.Send(cmd.Set(kRCX_SetWatchOp, (UByte)hour, (UByte)minute));
-}
-
 
 RCX_Result ProcessFile(const char *sourceFile, const Request &req)
 {
@@ -604,9 +605,14 @@ RCX_Result ProcessFile(const char *sourceFile, const Request &req)
     if (compiled)
         Compiler::Get()->Reset();
 
+
+// The option to provide a file that is not to be compiled is not supported in WebAssembly
+#ifndef __wasm__
     if (req.fDownload) {
+    	// The supplied input file was specified to not be compiled
         result = Download(image);
     }
+#endif
 
     // Check for the case of a listing or output file failure but
     // download ok.  In this case an error code must still be returned
@@ -642,52 +648,6 @@ bool GenerateListing(RCX_Image *image, const char *fileName, bool includeSource,
 
     return true;
 }
-
-RCX_Result GetBatteryLevel()
-{
-    RCX_Result result;
-
-    result = gLink.Open();
-    if (RCX_ERROR(result)) return result;
-
-    result = gLink.GetBatteryLevel();
-    if (!RCX_ERROR(result)) {
-        fprintf(STDERR, "Battery Level = %3.3fV\n", (double)result / 1000);
-        int lowBatt = (gTargetType == kRCX_SpyboticsTarget) ? kLow45Battery : kLowBattery;
-        if (result < lowBatt)
-            fprintf(STDERR, "Warning: battery level is low.\n");
-
-        return kRCX_OK;
-    }
-    else {
-        fprintf(STDERR, "Error: Could not fetch battery status.\n");
-        return result;
-    }
-}
-
-RCX_Result Download(RCX_Image *image)
-{
-    RCX_Result result;
-    RCX_Cmd cmd;
-
-    fprintf(STDERR, "Sending program [%d bytes]:\n", image->GetSize());
-
-    result = gLink.Open();
-    if (result != kRCX_OK) goto ErrorReturn;
-
-    result = image->Download(&gLink);
-    fputc('\n', STDERR);
-    if (result != kRCX_OK) goto ErrorReturn;
-
-    fprintf(STDERR, "Ok\n");
-
-    return kRCX_OK;
-
-ErrorReturn:
-    fprintf(STDERR, "Error: program transfer failed (%d)\n", result);
-    return result;
-}
-
 
 RCX_Image *Compile(const char *sourceFile, int flags)
 {
@@ -739,6 +699,84 @@ RCX_Image *Compile(const char *sourceFile, int flags)
 #endif
 }
 
+// There is no communication with the brick from WebAssembly
+#ifndef __wasm__
+
+/**
+ * Set the clock/watch on the target
+ *
+ * @param timeSpec a string to be converted into 24h hh:mm time, or "now" for current
+ *  local time
+ * @return the RCX_Result from running kRCX_SetWatchOp
+ */
+RCX_Result SetWatch(const char *timeSpec)
+{
+    int hour;
+    int minute;
+    RCX_Cmd cmd;
+
+    if (strcmp(timeSpec, "now")==0) {
+        time_t t;
+        struct tm *tmp;
+
+        time(&t);
+        tmp = localtime(&t);
+        hour = tmp->tm_hour;
+        minute = tmp->tm_min;
+    }
+    else {
+        int t = atoi(timeSpec);
+        hour = t / 100;
+        minute = t % 100;
+    }
+
+    return gLink.Send(cmd.Set(kRCX_SetWatchOp, (UByte)hour, (UByte)minute));
+}
+
+RCX_Result GetBatteryLevel()
+{
+    RCX_Result result;
+
+    result = gLink.Open();
+    if (RCX_ERROR(result)) return result;
+
+    result = gLink.GetBatteryLevel();
+    if (!RCX_ERROR(result)) {
+        fprintf(STDERR, "Battery Level = %3.3fV\n", (double)result / 1000);
+        int lowBatt = (gTargetType == kRCX_SpyboticsTarget) ? kLow45Battery : kLowBattery;
+        if (result < lowBatt)
+            fprintf(STDERR, "Warning: battery level is low.\n");
+
+        return kRCX_OK;
+    }
+    else {
+        fprintf(STDERR, "Error: Could not fetch battery status.\n");
+        return result;
+    }
+}
+
+RCX_Result Download(RCX_Image *image)
+{
+    RCX_Result result;
+    RCX_Cmd cmd;
+
+    fprintf(STDERR, "Sending program [%d bytes]:\n", image->GetSize());
+
+    result = gLink.Open();
+    if (result != kRCX_OK) goto ErrorReturn;
+
+    result = image->Download(&gLink);
+    fputc('\n', STDERR);
+    if (result != kRCX_OK) goto ErrorReturn;
+
+    fprintf(STDERR, "Ok\n");
+
+    return kRCX_OK;
+
+ErrorReturn:
+    fprintf(STDERR, "Error: program transfer failed (%d)\n", result);
+    return result;
+}
 
 RCX_Result UploadDatalog(bool verbose)
 {
@@ -901,6 +939,7 @@ RCX_Result SendRemote(const char *event, int repeat)
 
     return kRCX_OK;
 }
+#endif
 
 
 char *CreateFilename(const char *source, const char *oldExt, const char *newExt)
@@ -1111,7 +1150,7 @@ void PrintVersion()
 {
     fprintf(STDERR,"nqc version %s (built %s, %s)\n",
         VERSION_STRING, __DATE__, __TIME__);
-    fprintf(STDERR,"     Copyright (C) 2005 John Hansen.  All Rights Reserved.\n");
+    fprintf(STDERR,"     Copyright © 2005 John Hansen.  All Rights Reserved.\n");
 }
 
 void PrintUsage()
@@ -1121,13 +1160,15 @@ void PrintUsage()
     PrintVersion();
     fprintf(stdout,"Usage: nqc [options] [actions] [ - | filename ] [actions]\n");
     fprintf(stdout,"   - : read from stdin instead of a source_file\n");
-    fprintf(stdout,"Options:\n");
+    fprintf(stdout,"Help Options:\n");
+    fprintf(stdout,"   -help: display command line options\n");
+    fprintf(stdout,"   -api: dump the standard API header file to stdout\n");
+    fprintf(stdout,"Compilation Options:\n");
     fprintf(stdout,"   -T<target>: target is one of:");
     for (unsigned i=0; i < sizeof(sTargetNames) / sizeof(const char *); ++i) {
         fprintf(stdout, " %s", sTargetNames[i]);
     }
     fprintf(stdout, " (target=%s)\n", targetName);
-    fprintf(stdout,"   -d: send program to \%s\n", targetName);
     fprintf(stdout,"   -n: prevent the API header file from being included\n");
     fprintf(stdout,"   -D<sym>[=<value>] : define macro <sym>\n");
     fprintf(stdout,"   -U<sym>: undefine macro <sym>\n");
@@ -1135,17 +1176,21 @@ void PrintUsage()
     fprintf(stdout,"   -R<filename> : redirect text output (datalog, etc) to <filename>\n");
     fprintf(stdout,"   -I<path>: search <path> for include files\n");
     fprintf(stdout,"   -L[<filename>] : generate code listing to <filename> (or stdout)\n");
+    fprintf(stdout,"   -l : generate code listing to stdout\n");
     fprintf(stdout,"   -s: include source code in listings if possible\n");
     fprintf(stdout,"   -c: generate LASM compatible listings\n");
     fprintf(stdout,"   -v: verbose\n");
     fprintf(stdout,"   -q: quiet; suppress action sounds\n");
+    fprintf(stdout,"   -O<outfile>: specify output file\n");
+    fprintf(stdout,"   -1: use NQC API 1.x compatibility mode\n");
+#ifndef __wasm__
+    fprintf(stdout,"   -b: treat input file as a binary file (don't compile it)\n");
+    fprintf(stdout,"Communication Options:\n");
+    fprintf(stdout,"   -d: send program to \%s\n", targetName);
     fprintf(stdout,"   -x: omit packet header (RCX, RCX2 targets only)\n");
     fprintf(stdout,"   -f<size>: set firmware chunk size in bytes\n");
     fprintf(stdout,"   -w<ms>: set the download wait timeout in milliseconds\n");
-    fprintf(stdout,"   -O<outfile>: specify output file\n");
     fprintf(stdout,"   -S<portname>: specify tower serial port\n");
-    fprintf(stdout,"   -b: treat input file as a binary file (don't compile it)\n");
-    fprintf(stdout,"   -1: use NQC API 1.x compatibility mode\n");
     fprintf(stdout,"Actions:\n");
     fprintf(stdout,"   -run: run current program\n");
     fprintf(stdout,"   -pgm <number>: select program number\n");
@@ -1161,11 +1206,11 @@ void PrintUsage()
     fprintf(stdout,"   -raw <data>: format data as a packet and send to %s\n", targetName);
     fprintf(stdout,"   -remote <value> <repeat>: invoke a remote command on the %s\n", targetName);
     fprintf(stdout,"   -clear: erase all programs and datalog on %s\n", targetName);
-    fprintf(stdout,"   -api: dump the standard API header file to stdout\n");
-    fprintf(stdout,"   -help: display command line options\n");
+#endif
 }
 
-
+// No AutoLink instance in WebAssembly
+#ifndef __wasm__
 RCX_Result AutoLink::Open()
 {
     RCX_Result result;
@@ -1230,7 +1275,7 @@ bool AutoLink::DownloadProgress(int /* soFar */, int /* total */, int chunkSize)
 
     return true;
 }
-
+#endif
 
 void MyCompiler::AddError(const Error &e, const LexLocation *loc)
 {
