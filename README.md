@@ -21,12 +21,24 @@ This release also attempts to build on the [jverne/nqc](https://github.com/jvern
 
 For bug reports about _this_ fork of NQC, please [file a GitHub Issue](https://github.com/BrickBot/nqc/issues) for this project.
 
-The original README from the NQC project follows.
+---
+
+WebAssembly Support
+===================
+
+A new NQC platform target implemented by GitHub user [maehw](https://github.com/maehw) is WebAssembly.
+The initial [WebNQC](https://github.com/maehw/WebNQC) implementation only targets WebAssembly (dropping support for Linux, Windows, and MacOS),
+but it might be possible to circle back and add WebAssembly as an additional platform target.
+
+With NQC compiled as **WebAssembly bytecode (WASM)**, it can run in a web browser—without any installation and independent of the machine’s platform (Windows, Linux, MacOS, etc).
+
 
 ---
 
-NQC ReadMe
-----------
+The original README from the NQC project follows:
+
+(Orignal) NQC ReadMe
+====================
 
 If you have a problem, PLEASE CHECK THE FAQ:
 * http://bricxcc.sourceforge.net/nqc/doc/faq.html
