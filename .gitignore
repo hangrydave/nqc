@@ -7,6 +7,7 @@
 # RCX specific "binaries"
 *.rcx
 bin/*
+utils/*
 
 # Object files
 *.o
