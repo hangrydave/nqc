@@ -168,18 +168,18 @@ COBJ = $(addprefix compiler/, $(addsuffix .o, $(COBJS)))
 NQCOBJS = nqc SRecord DirList CmdLine
 NQCOBJ = $(addprefix nqc/, $(addsuffix .o, $(NQCOBJS)))
 
-all : info bin nqh nub bin/nqc
+all : info bin nqh nub bin/nqc$(EXT)
 
-# Create the directories used for the build outputs
+# Create the directory used for the build output
 # This prevents the need to tell the user to do it.
 bin:
 	$(MKDIR) bin
-	$(MKDIR) utils
 
 bin/nqc$(EXT): compiler/parse.cpp $(OBJ)
 	$(CXX) -o $@ $(OBJ) $(LIBS)
 
 utils/mkdata: mkdata/mkdata.cpp nqc/SRecord.cpp
+	$(MKDIR) utils
 	$(CXX) -o $@ $(INCLUDES) $^
 
 #
