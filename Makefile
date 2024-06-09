@@ -19,6 +19,7 @@
 #		Patrick Nadeau <pnadeau@wave.home.com>
 #		Jonathan W. Miner <jminer@fcmail.com>
 #		Matthew Sheets
+#		Maeh W. <maehw@posteo.de>
 #
 #
 .SUFFIXES: .cpp .c
@@ -66,16 +67,27 @@ INCLUDES = $(addprefix -I, $(INCLUDE_DIRS))
 # Common compiler flags
 CFLAGS += $(INCLUDES) -Wall
 
-# Default to NO USB tower support. USB support can be enabled
-# via the platform-specific settings, below.
-USBOBJ = RCX_USBTowerPipe_none
-TCPOBJ = RCX_TcpPipe_none
+# Default output folder
+OUTDIR ?= bin
+
+# Default to NO USB tower support and NO TCP support.
+# USB and TCP support can be enabled
+# via the platform-specific settings below.
+USBOBJ ?= RCX_USBTowerPipe_none
+TCPOBJ ?= RCX_TcpPipe_none
 
 #
 # Platform specific settings
 #
 OSTYPE := $(strip $(shell uname -s))
 
+ifneq (,$(strip $(findstring $(MAKECMDGOALS), WebAssembly)))
+	# WebAssembly
+	CXX = emcc
+	CXX_ARGS += --shell-file ./emscripten/webnqc_shell.html -s INVOKE_RUN=0 -s MODULARIZE=1 -s EXPORT_NAME=createWebNqc -s EXPORTED_RUNTIME_METHODS='["callMain","FS"]'
+	OUTDIR = wasm
+	EXT = .html
+else
 ifneq (,$(strip $(findstring $(OSTYPE), Darwin)))
 	# Mac OS X
 	LIBS += -framework IOKit -framework CoreFoundation
@@ -109,6 +121,7 @@ ifneq (,$(strip $(findstring $(OSTYPE), OpenBSD)))
 else
   	# default Unix build without USB support
   	CFLAGS += -O2
+endif
 endif
 endif
 endif
@@ -168,19 +181,25 @@ COBJ = $(addprefix compiler/, $(addsuffix .o, $(COBJS)))
 NQCOBJS = nqc SRecord DirList CmdLine
 NQCOBJ = $(addprefix nqc/, $(addsuffix .o, $(NQCOBJS)))
 
-all : info bin nqh nub bin/nqc$(EXT)
+
+all : info utils nqh nub exec
+
+exec: $(OUTDIR) $(OUTDIR)/nqc$(EXT)
+
 
 # Create the directory used for the build output
 # This prevents the need to tell the user to do it.
-bin:
-	$(MKDIR) bin
+$(OUTDIR):
+	$(MKDIR) $(OUTDIR)
 
-bin/nqc$(EXT): compiler/parse.cpp $(OBJ)
-	$(CXX) -o $@ $(OBJ) $(LIBS)
+$(OUTDIR)/nqc$(EXT): compiler/parse.cpp $(OBJ)
+	$(CXX) -o $@ $(CXX_ARGS) $(OBJ) $(LIBS)
 
-utils/mkdata: mkdata/mkdata.cpp nqc/SRecord.cpp
-	$(MKDIR) utils
-	$(CXX) -o $@ $(INCLUDES) $^
+#
+# general rule for compiling
+#
+.cpp.o:
+	$(CXX) -c $(CFLAGS) $< -o $*.o
 
 #
 # clean up stuff
@@ -188,7 +207,8 @@ utils/mkdata: mkdata/mkdata.cpp nqc/SRecord.cpp
 clean: clean-parser clean-lexer clean-obj clean-nqh clean-nub
 
 clean-obj:
-	-$(RM) bin/*
+	-$(RM) $(OUTDIR)/*
+	-$(RM) utils/*
 	-$(RM) */*.o
 
 clean-parser:
@@ -220,6 +240,18 @@ compiler/lexer.cpp: compiler/lex.l
 	$(FLEX) lex.l
 
 #
+# Utilities
+#
+utils:
+	$(MKDIR) utils
+
+#
+# mkdata utility
+#
+utils/mkdata: mkdata/mkdata.cpp nqc/SRecord.cpp
+	$(CXX) -o $@ $(INCLUDES) $^
+
+#
 # NQH files
 #
 nqh: compiler/rcx1_nqh.h compiler/rcx2_nqh.h
@@ -237,12 +269,6 @@ nub: rcxlib/rcxnub.h
 
 rcxlib/rcxnub.h: rcxlib/fastdl.srec utils/mkdata
 	utils/mkdata -s $< $@ rcxnub
-
-#
-# general rule for compiling
-#
-.cpp.o:
-	$(CXX) -c $(CFLAGS) $< -o $*.o
 
 #
 # Use these targets to use the default parser/lexer files.  This is handy if
@@ -276,7 +302,7 @@ docs:
 #
 install: all
 	test -d $(DESTDIR)$(BINDIR) || mkdir -p $(DESTDIR)$(BINDIR)
-	cp -r bin/* $(DESTDIR)$(BINDIR)
+	cp -r $(OUTDIR)/* $(DESTDIR)$(BINDIR)
 	test -d $(DESTDIR)$(MANDIR)  || mkdir -p $(DESTDIR)$(MANDIR)
 	cp nqc-man-2.1r1-0.man $(DESTDIR)$(MANDIR)/nqc.$(MANEXT)
 
@@ -285,6 +311,7 @@ install: all
 #
 info:
 	@echo Building for: $(OSTYPE)
+	@echo OUTDIR=$(OUTDIR)
 	@echo EXT=$(EXT)
 	@echo USBOBJ=$(USBOBJ)
 	@echo TCPOBJ=$(TCPOBJ)
