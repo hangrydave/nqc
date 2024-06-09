@@ -19,6 +19,6 @@ jobs:
     - name: apt-get update
       run: sudo apt-get --assume-yes update
     - name: install build dependencies
-      run: sudo apt-get --assume-yes install flex bison
+      run: sudo apt-get --assume-yes install flex bison emscripten
     - name: make
       run: make DEFAULT_SERIAL_NAME='"/dev/ttyS0"' DEFAULT_USB_NAME='"/dev/usb/legousbtower0"' DEFAULT_PORT_NAME='"usb"'
