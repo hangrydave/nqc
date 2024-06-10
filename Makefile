@@ -81,10 +81,10 @@ TCPOBJ ?= RCX_TcpPipe_none
 #
 OSTYPE := $(strip $(shell uname -s))
 
-ifneq (,$(strip $(findstring $(MAKECMDGOALS), WebAssembly)))
+ifneq (,$(strip $(findstring $(TARGETTYPE), WebAssembly)))
 	# WebAssembly
 	CXX = emcc
-	CXX_ARGS += --shell-file ./emscripten/webnqc_shell.html -s INVOKE_RUN=0 -s MODULARIZE=1 -s EXPORT_NAME=createWebNqc -s EXPORTED_RUNTIME_METHODS='["callMain","FS"]'
+	CFLAGS_EXEC += --shell-file ./emscripten/webnqc_shell.html -s INVOKE_RUN=0 -s MODULARIZE=1 -s EXPORT_NAME=createWebNqc -s EXPORTED_RUNTIME_METHODS='["callMain","FS"]'
 	OUTDIR = wasm
 	EXT = .html
 else
@@ -182,18 +182,19 @@ NQCOBJS = nqc SRecord DirList CmdLine
 NQCOBJ = $(addprefix nqc/, $(addsuffix .o, $(NQCOBJS)))
 
 
-all : info utils nqh nub exec
+all : info nqh nub exec emscripten-emmake
 
-exec: $(OUTDIR) $(OUTDIR)/nqc$(EXT)
-
-
-# Create the directory used for the build output
-# This prevents the need to tell the user to do it.
-$(OUTDIR):
-	$(MKDIR) $(OUTDIR)
+exec: $(OUTDIR)/nqc$(EXT)
 
 $(OUTDIR)/nqc$(EXT): compiler/parse.cpp $(OBJ)
-	$(CXX) -o $@ $(CXX_ARGS) $(OBJ) $(LIBS)
+	$(MKDIR) $(OUTDIR)
+	$(CXX) -o $@ $(CFLAGS_EXEC) $(OBJ) $(LIBS)
+
+#
+# Emscripten build for WebAssembly
+#
+emscripten-emmake:
+	emmake make exec TARGETTYPE=WebAssembly
 
 #
 # general rule for compiling
@@ -208,7 +209,9 @@ clean: clean-parser clean-lexer clean-obj clean-nqh clean-nub
 
 clean-obj:
 	-$(RM) $(OUTDIR)/*
+	-$(RM) bin/*
 	-$(RM) utils/*
+	-$(RM) wasm/*
 	-$(RM) */*.o
 
 clean-parser:
@@ -240,15 +243,10 @@ compiler/lexer.cpp: compiler/lex.l
 	$(FLEX) lex.l
 
 #
-# Utilities
-#
-utils:
-	$(MKDIR) utils
-
-#
 # mkdata utility
 #
 utils/mkdata: mkdata/mkdata.cpp nqc/SRecord.cpp
+	$(MKDIR) utils
 	$(CXX) -o $@ $(INCLUDES) $^
 
 #
