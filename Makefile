@@ -219,12 +219,7 @@ clean: clean-parser clean-lexer clean-obj clean-nqh clean-nub
 
 clean-obj:
 	-$(RM) $(BUILD_DIR)/*
-	-$(RM) $(EXEC_DIR)/*
-	-$(RM) bin/*
-	-$(RM) utils/*
-	-$(RM) wasm/*
 	-$(RM) */*.o
-	-$(RM) */*.wobj
 
 clean-parser:
 	-$(RM) compiler/parse.cpp compiler/parse.tab.h
