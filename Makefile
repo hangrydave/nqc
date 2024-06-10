@@ -195,13 +195,13 @@ $(OUTDIR)/nqc$(EXEC_EXT): compiler/parse.cpp $(OBJ)
 #
 # Emscripten build for WebAssembly
 #
-emscripten-emmake:
+emscripten-emmake: info
 	emmake make exec TARGETTYPE=WebAssembly
 
 #
 # general rule for compiling
 #
-.cpp.$(OBJ_EXT):
+%.$(OBJ_EXT):
 	$(CXX) -c $(CFLAGS) $< -o $*.$(OBJ_EXT)
 
 #
