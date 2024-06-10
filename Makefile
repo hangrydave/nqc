@@ -178,7 +178,7 @@ COBJS = AsmStmt AssignStmt BlockStmt Bytecode Conditional \
 	TaskIdExpr RelExpr LogicalExpr NegateExpr IndirectExpr \
 	NodeExpr ShiftExpr TernaryExpr VarAllocator VarTranslator \
 	Resource AddrOfExpr DerefExpr GosubParamStmt
-COBJ = $(addprefix compiler/, $(addsuffix $(OBJ_EXT), $(COBJS)))
+COBJ = $(addprefix compiler/, $(addsuffix .$(OBJ_EXT), $(COBJS)))
 
 NQCOBJS = nqc SRecord DirList CmdLine
 NQCOBJ = $(addprefix nqc/, $(addsuffix .$(OBJ_EXT), $(NQCOBJS)))
