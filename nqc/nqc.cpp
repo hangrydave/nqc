@@ -1086,10 +1086,13 @@ void PrintError(RCX_Result error, const char *filename)
             fprintf(STDERR, "Problem talking to IR device\n");
             break;
         case kRCX_ReplyError:
+#ifndef __wasm__
             if (gLink.WasErrorFromMissingFirmware()) {
                 fprintf(STDERR, "No firmware installed on %s\n", targetName);
             }
-            else {
+            else
+#endif
+            {
                 fprintf(STDERR, "No reply from %s\n", targetName);
             }
             break;
@@ -1150,7 +1153,7 @@ void PrintVersion()
 {
     fprintf(STDERR,"nqc version %s (built %s, %s)\n",
         VERSION_STRING, __DATE__, __TIME__);
-    fprintf(STDERR,"     Copyright © 2005 John Hansen.  All Rights Reserved.\n");
+    fprintf(STDERR,"     Copyright (C) 2005 John Hansen.  All Rights Reserved.\n");
 }
 
 void PrintUsage()
