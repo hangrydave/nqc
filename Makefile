@@ -201,7 +201,7 @@ emscripten-emmake: info
 #
 # general rule for compiling
 #
-.cpp.$(OBJ_EXT) .$(OBJ_EXT):
+.cpp.$(OBJ_EXT) %.$(OBJ_EXT):
 	$(CXX) -c $(CFLAGS) $< -o $*.$(OBJ_EXT)
 
 #
