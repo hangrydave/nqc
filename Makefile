@@ -67,8 +67,9 @@ INCLUDES = $(addprefix -I, $(INCLUDE_DIRS))
 # Common compiler flags
 CFLAGS += $(INCLUDES) -Wall
 
-# Default output folder
+# Default configuration values
 OUTDIR ?= bin
+OBJ_EXT ?= o
 
 # Default to NO USB tower support and NO TCP support.
 # USB and TCP support can be enabled
@@ -86,7 +87,8 @@ ifneq (,$(strip $(findstring $(TARGETTYPE), WebAssembly)))
 	CXX = emcc
 	CFLAGS_EXEC += --shell-file ./emscripten/webnqc_shell.html -s INVOKE_RUN=0 -s MODULARIZE=1 -s EXPORT_NAME=createWebNqc -s EXPORTED_RUNTIME_METHODS='["callMain","FS"]'
 	OUTDIR = wasm
-	EXT = .html
+	OBJ_EXT = wobj
+	EXEC_EXT = .html
 else
 ifneq (,$(strip $(findstring $(OSTYPE), Darwin)))
 	# Mac OS X
@@ -158,10 +160,10 @@ RCXOBJS = RCX_Cmd RCX_Disasm RCX_Image RCX_Link RCX_Log \
 	RCX_Target RCX_Pipe RCX_PipeTransport RCX_Transport \
 	RCX_SpyboticsLinker RCX_SerialPipe \
 	$(USBOBJ) $(TCPOBJ)
-RCXOBJ = $(addprefix rcxlib/, $(addsuffix .o, $(RCXOBJS)))
+RCXOBJ = $(addprefix rcxlib/, $(addsuffix .$(OBJ_EXT), $(RCXOBJS)))
 
 POBJS = PStream PSerial_unix PHashTable PListS PDebug StrlUtil
-POBJ = $(addprefix platform/, $(addsuffix .o, $(POBJS)))
+POBJ = $(addprefix platform/, $(addsuffix .$(OBJ_EXT), $(POBJS)))
 
 COBJS = AsmStmt AssignStmt BlockStmt Bytecode Conditional \
 	CondParser DoStmt Expansion Fragment IfStmt JumpStmt \
@@ -176,17 +178,17 @@ COBJS = AsmStmt AssignStmt BlockStmt Bytecode Conditional \
 	TaskIdExpr RelExpr LogicalExpr NegateExpr IndirectExpr \
 	NodeExpr ShiftExpr TernaryExpr VarAllocator VarTranslator \
 	Resource AddrOfExpr DerefExpr GosubParamStmt
-COBJ = $(addprefix compiler/, $(addsuffix .o, $(COBJS)))
+COBJ = $(addprefix compiler/, $(addsuffix $(OBJ_EXT), $(COBJS)))
 
 NQCOBJS = nqc SRecord DirList CmdLine
-NQCOBJ = $(addprefix nqc/, $(addsuffix .o, $(NQCOBJS)))
+NQCOBJ = $(addprefix nqc/, $(addsuffix .$(OBJ_EXT), $(NQCOBJS)))
 
 
 all : info nqh nub exec emscripten-emmake
 
-exec: $(OUTDIR)/nqc$(EXT)
+exec: $(OUTDIR)/nqc$(EXEC_EXT)
 
-$(OUTDIR)/nqc$(EXT): compiler/parse.cpp $(OBJ)
+$(OUTDIR)/nqc$(EXEC_EXT): compiler/parse.cpp $(OBJ)
 	$(MKDIR) $(OUTDIR)
 	$(CXX) -o $@ $(CFLAGS_EXEC) $(OBJ) $(LIBS)
 
@@ -199,8 +201,8 @@ emscripten-emmake:
 #
 # general rule for compiling
 #
-.cpp.o:
-	$(CXX) -c $(CFLAGS) $< -o $*.o
+.cpp.$(OBJ_EXT):
+	$(CXX) -c $(CFLAGS) $< -o $*.$(OBJ_EXT)
 
 #
 # clean up stuff
@@ -213,6 +215,7 @@ clean-obj:
 	-$(RM) utils/*
 	-$(RM) wasm/*
 	-$(RM) */*.o
+	-$(RM) */*.wobj
 
 clean-parser:
 	-$(RM) compiler/parse.cpp compiler/parse.tab.h
@@ -310,7 +313,8 @@ install: all
 info:
 	@echo Building for: $(OSTYPE)
 	@echo OUTDIR=$(OUTDIR)
-	@echo EXT=$(EXT)
+	@echo OBJ_EXT=$(OBJ_EXT)
+	@echo EXEC_EXT=$(EXEC_EXT)
 	@echo USBOBJ=$(USBOBJ)
 	@echo TCPOBJ=$(TCPOBJ)
 	@echo PREFIX=$(PREFIX)
@@ -319,4 +323,5 @@ info:
 	@echo LIBS=$(LIBS)
 	@echo CXX=$(CXX)
 	@echo CFLAGS=$(CFLAGS)
+	@echo CFLAGS_EXEC=$(CFLAGS_EXEC)
 	@echo OBJ=$(OBJ)
