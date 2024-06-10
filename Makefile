@@ -208,9 +208,9 @@ emscripten-emmake:
 #
 # general rule for compiling
 #
-.cpp.o:
+$(OBJ_DIR)/%.o: %.cpp
 	$(MKDIR) $(dir $@)
-	$(CXX) -c $(CFLAGS) $< -o $*.o
+	$(CXX) -c $(CFLAGS) $< -o $@
 
 #
 # clean up stuff
