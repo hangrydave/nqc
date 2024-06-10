@@ -6,8 +6,9 @@
 
 # RCX specific "binaries"
 *.rcx
-bin/*
-utils/*
+
+# Build output folder
+build/*
 
 # Object files
 *.o

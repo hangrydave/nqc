@@ -55,7 +55,7 @@ MANEXT ?= 1
 
 # other commands
 CP ?= cp -f
-MKDIR ?= mkdir
+MKDIR ?= mkdir -p
 MV ?= mv -f
 RM ?= rm -f
 DOXYGEN ?= doxygen
@@ -68,8 +68,15 @@ INCLUDES = $(addprefix -I, $(INCLUDE_DIRS))
 CFLAGS += $(INCLUDES) -Wall
 
 # Default configuration values
-OUTDIR ?= bin
-OBJ_EXT ?= o
+OBJ_SUBDIR_NAME ?= obj
+UTILS_SUBDIR_NAME ?= utils
+EXEC_SUBDIR_NAME ?= bin
+
+BUILD_DIR ?= build
+OBJ_DIR ?= $(BUILD_DIR)/$(OBJ_SUBDIR_NAME)
+EXEC_DIR ?= $(BUILD_DIR)/$(EXEC_SUBDIR_NAME)
+UTILS_DIR ?= $(BUILD_DIR)/$(UTILS_SUBDIR_NAME)
+
 
 # Default to NO USB tower support and NO TCP support.
 # USB and TCP support can be enabled
@@ -86,8 +93,8 @@ ifneq (,$(strip $(findstring $(TARGETTYPE), WebAssembly)))
 	# WebAssembly
 	CXX = emcc
 	CFLAGS_EXEC += --shell-file ./emscripten/webnqc_shell.html -s INVOKE_RUN=0 -s MODULARIZE=1 -s EXPORT_NAME=createWebNqc -s EXPORTED_RUNTIME_METHODS='["callMain","FS"]'
-	OUTDIR = wasm
-	OBJ_EXT = wobj
+	OBJ_SUBDIR_NAME = wobj
+	EXEC_SUBDIR_NAME = wasm
 	EXEC_EXT = .html
 else
 ifneq (,$(strip $(findstring $(OSTYPE), Darwin)))
@@ -154,16 +161,16 @@ CFLAGS += -DDEFAULT_DEVICE_NAME='$(DEFAULT_DEVICE_NAME)'
 #
 # Object files
 #
-OBJ = $(NQCOBJ) $(COBJ) $(RCXOBJ) $(POBJ)
+OBJ = $(addprefix $(OBJ_DIR)/, $(NQCOBJ) $(COBJ) $(RCXOBJ) $(POBJ))
 
 RCXOBJS = RCX_Cmd RCX_Disasm RCX_Image RCX_Link RCX_Log \
 	RCX_Target RCX_Pipe RCX_PipeTransport RCX_Transport \
 	RCX_SpyboticsLinker RCX_SerialPipe \
 	$(USBOBJ) $(TCPOBJ)
-RCXOBJ = $(addprefix rcxlib/, $(addsuffix .$(OBJ_EXT), $(RCXOBJS)))
+RCXOBJ = $(addprefix rcxlib/, $(addsuffix .o, $(RCXOBJS)))
 
 POBJS = PStream PSerial_unix PHashTable PListS PDebug StrlUtil
-POBJ = $(addprefix platform/, $(addsuffix .$(OBJ_EXT), $(POBJS)))
+POBJ = $(addprefix platform/, $(addsuffix .o, $(POBJS)))
 
 COBJS = AsmStmt AssignStmt BlockStmt Bytecode Conditional \
 	CondParser DoStmt Expansion Fragment IfStmt JumpStmt \
@@ -178,31 +185,32 @@ COBJS = AsmStmt AssignStmt BlockStmt Bytecode Conditional \
 	TaskIdExpr RelExpr LogicalExpr NegateExpr IndirectExpr \
 	NodeExpr ShiftExpr TernaryExpr VarAllocator VarTranslator \
 	Resource AddrOfExpr DerefExpr GosubParamStmt
-COBJ = $(addprefix compiler/, $(addsuffix .$(OBJ_EXT), $(COBJS)))
+COBJ = $(addprefix compiler/, $(addsuffix .o, $(COBJS)))
 
 NQCOBJS = nqc SRecord DirList CmdLine
-NQCOBJ = $(addprefix nqc/, $(addsuffix .$(OBJ_EXT), $(NQCOBJS)))
+NQCOBJ = $(addprefix nqc/, $(addsuffix .o, $(NQCOBJS)))
 
 
 all : info nqh nub exec emscripten-emmake
 
-exec: $(OUTDIR)/nqc$(EXEC_EXT)
+exec: info $(EXEC_DIR)/nqc$(EXEC_EXT)
 
-$(OUTDIR)/nqc$(EXEC_EXT): compiler/parse.cpp $(OBJ)
-	$(MKDIR) $(OUTDIR)
+$(EXEC_DIR)/nqc$(EXEC_EXT): compiler/parse.cpp $(OBJ)
+	$(MKDIR) $(dir $@)
 	$(CXX) -o $@ $(CFLAGS_EXEC) $(OBJ) $(LIBS)
 
 #
 # Emscripten build for WebAssembly
 #
-emscripten-emmake: info
+emscripten-emmake:
 	emmake make exec TARGETTYPE=WebAssembly
 
 #
 # general rule for compiling
 #
-.cpp.$(OBJ_EXT) %.$(OBJ_EXT):
-	$(CXX) -c $(CFLAGS) $< -o $*.$(OBJ_EXT)
+.cpp.o:
+	$(MKDIR) $(dir $@)
+	$(CXX) -c $(CFLAGS) $< -o $*.o
 
 #
 # clean up stuff
@@ -210,7 +218,8 @@ emscripten-emmake: info
 clean: clean-parser clean-lexer clean-obj clean-nqh clean-nub
 
 clean-obj:
-	-$(RM) $(OUTDIR)/*
+	-$(RM) $(BUILD_DIR)/*
+	-$(RM) $(EXEC_DIR)/*
 	-$(RM) bin/*
 	-$(RM) utils/*
 	-$(RM) wasm/*
@@ -248,8 +257,8 @@ compiler/lexer.cpp: compiler/lex.l
 #
 # mkdata utility
 #
-utils/mkdata: mkdata/mkdata.cpp nqc/SRecord.cpp
-	$(MKDIR) utils
+$(UTILS_DIR)/mkdata: mkdata/mkdata.cpp nqc/SRecord.cpp
+	$(MKDIR) $(dir $@)
 	$(CXX) -o $@ $(INCLUDES) $^
 
 #
@@ -257,19 +266,19 @@ utils/mkdata: mkdata/mkdata.cpp nqc/SRecord.cpp
 #
 nqh: compiler/rcx1_nqh.h compiler/rcx2_nqh.h
 
-compiler/rcx1_nqh.h: compiler/rcx1.nqh utils/mkdata
-	utils/mkdata $< $@ rcx1_nqh
+compiler/rcx1_nqh.h: compiler/rcx1.nqh $(UTILS_DIR)/mkdata
+	$(UTILS_DIR)/mkdata $< $@ rcx1_nqh
 
-compiler/rcx2_nqh.h: compiler/rcx2.nqh utils/mkdata
-	utils/mkdata $< $@ rcx2_nqh
+compiler/rcx2_nqh.h: compiler/rcx2.nqh $(UTILS_DIR)/mkdata
+	$(UTILS_DIR)/mkdata $< $@ rcx2_nqh
 
 #
 # rcxnub.h
 #
 nub: rcxlib/rcxnub.h
 
-rcxlib/rcxnub.h: rcxlib/fastdl.srec utils/mkdata
-	utils/mkdata -s $< $@ rcxnub
+rcxlib/rcxnub.h: rcxlib/fastdl.srec $(UTILS_DIR)/mkdata
+	$(UTILS_DIR)/mkdata -s $< $@ rcxnub
 
 #
 # Use these targets to use the default parser/lexer files.  This is handy if
@@ -303,7 +312,7 @@ docs:
 #
 install: all
 	test -d $(DESTDIR)$(BINDIR) || mkdir -p $(DESTDIR)$(BINDIR)
-	cp -r $(OUTDIR)/* $(DESTDIR)$(BINDIR)
+	cp -r $(EXEC_DIR)/* $(DESTDIR)$(BINDIR)
 	test -d $(DESTDIR)$(MANDIR)  || mkdir -p $(DESTDIR)$(MANDIR)
 	cp nqc-man-2.1r1-0.man $(DESTDIR)$(MANDIR)/nqc.$(MANEXT)
 
@@ -312,8 +321,10 @@ install: all
 #
 info:
 	@echo Building for: $(OSTYPE)
-	@echo OUTDIR=$(OUTDIR)
-	@echo OBJ_EXT=$(OBJ_EXT)
+	@echo BUILD_DIR=$(BUILD_DIR)
+	@echo OBJ_DIR=$(OBJ_DIR)
+	@echo UTILS_DIR=$(UTILS_DIR)
+	@echo EXEC_DIR=$(EXEC_DIR)
 	@echo EXEC_EXT=$(EXEC_EXT)
 	@echo USBOBJ=$(USBOBJ)
 	@echo TCPOBJ=$(TCPOBJ)
