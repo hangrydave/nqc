@@ -29,3 +29,5 @@ rcxlib/rcxnub.h
 doc/html/*
 doc/latex/*
 doc/*.log
+
+bin/*

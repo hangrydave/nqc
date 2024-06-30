@@ -1,0 +1,15 @@
+{
+    "cmake.configureOnOpen": false,
+    "makefile.launchConfigurations": [
+        {
+            "cwd": "/home/davidreidsma/Programming/nqc/bin",
+            "binaryPath": "/home/davidreidsma/Programming/nqc/bin/nqc",
+            "binaryArgs": []
+        }
+    ],
+    "makefile.makefilePath": "Makefile",
+    "files.associations": {
+        "vector": "cpp",
+        "string": "cpp"
+    }
+}

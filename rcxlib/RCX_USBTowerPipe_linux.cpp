@@ -161,6 +161,7 @@ void RCX_USBTowerPipe_linux::SetTimeout(long timeout_ms)
 		timeout_ms = 20;
 	}
 
-	ioctl(fd, LEGO_TOWER_SET_READ_TIMEOUT, timeout_ms);
+	timeout_ms = ioctl(fd, LEGO_TOWER_SET_READ_TIMEOUT, timeout_ms);
+	return;
 }
 

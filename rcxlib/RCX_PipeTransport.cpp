@@ -279,7 +279,7 @@ void RCX_PipeTransport::SendFromTxBuffer(int delay)
     // send command
     fPipe->Write(fTxData, fTxLength);
     if (fVerbose) {
-        printf("Tx: ");
+        // printf("Tx: ");
         DumpData(fTxData, fTxLength);
     }
 }
@@ -303,7 +303,7 @@ RCX_Result RCX_PipeTransport::ReceiveReply(int rxExpected, int timeout, int &rep
         PDEBUGVAR("fRxLength", fRxLength);
         if (bFirstRead) {
             bFirstRead = false;
-            if (fVerbose) printf("expecting %d bytes, timeout = %d\n", receiveLen, timeout);
+            // if (fVerbose) printf("expecting %d bytes, timeout = %d\n", receiveLen, timeout);
 
             int bytesRead = fPipe->Read(fRxData+fRxLength, receiveLen, timeout);
             PDEBUGVAR("bytesRead", bytesRead);
@@ -312,17 +312,17 @@ RCX_Result RCX_PipeTransport::ReceiveReply(int rxExpected, int timeout, int &rep
             }
 
             fRxLength += bytesRead;
-            if (fVerbose) printf("read %d bytes, total = %d\n", bytesRead, fRxLength);
+            // if (fVerbose) printf("read %d bytes, total = %d\n", bytesRead, fRxLength);
         }
         else {
-            if (fVerbose) printf("expecting 1 byte, timeout = %d\n", timeout);
+            // if (fVerbose) printf("expecting 1 byte, timeout = %d\n", timeout);
 
             if (fPipe->Read(fRxData+fRxLength, 1, timeout) != 1) {
                 break;
             }
 
             fRxLength++;
-            if (fVerbose) printf("read 1 byte, total = %d\n", fRxLength);
+            // if (fVerbose) printf("read 1 byte, total = %d\n", fRxLength);
         }
 
         // check for replies
@@ -334,8 +334,8 @@ RCX_Result RCX_PipeTransport::ReceiveReply(int rxExpected, int timeout, int &rep
     }
 
     if (fVerbose) {
-        printf("Rx: ");
-        DumpData(fRxData, fRxLength);
+        // printf("Rx: ");
+        // DumpData(fRxData, fRxLength);
     }
 
     if (fRxLength == 0

@@ -646,7 +646,7 @@ RCX_Result RCX_Link::Download(const UByte *data, int length, int chunk)
         n = AdjustChunkSize(n, data, fTransport->GetComplementData());
         PDEBUGVAR("sending bytes", n);
         if (fVerbose) {
-            printf("sending %d bytes\n", n);
+            // printf("sending %d bytes\n", n);
         }
 
         result = Send(cmd.MakeDownload(seq++, data, (UShort)n),

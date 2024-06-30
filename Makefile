@@ -276,6 +276,12 @@ rcxlib/rcxnub.h: rcxlib/fastdl.srec $(UTILS_DIR)/mkdata
 	$(UTILS_DIR)/mkdata -s $< $@ rcxnub
 
 #
+# general rule for compiling
+#
+.cpp.o:
+	$(CXX) -g -c $(CFLAGS) $< -o $*.o
+
+#
 # Use these targets to use the default parser/lexer files.  This is handy if
 # your system does not have a suitable flex and/or yacc tool.
 #
